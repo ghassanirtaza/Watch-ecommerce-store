@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint-typecheck-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Prisma schema validation
+        run: npx prisma validate
+
+      - name: Prisma Client generation
+        run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests (pure logic only — no DB)
+        run: npm run test
+
+  # Integration tests need a real Postgres instance. Enable this job
+  # once src/tests/integration/*.test.ts has its `.skip` removed (see
+  # AI_CONTEXT.md Phase 8 status) — left commented rather than wired
+  # to run against nothing, which would either fail loudly (blocking
+  # every PR) or silently pass on skipped tests and give false
+  # confidence that integration coverage exists.
+  #
+  # integration-tests:
+  #   runs-on: ubuntu-latest
+  #   services:
+  #     postgres:
+  #       image: postgres:16
+  #       env:
+  #         POSTGRES_PASSWORD: test
+  #         POSTGRES_DB: watch_ecommerce_test
+  #       ports: ["5432:5432"]
+  #       options: >-
+  #         --health-cmd pg_isready
+  #         --health-interval 10s
+  #         --health-timeout 5s
+  #         --health-retries 5
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with: { node-version: "20", cache: "npm" }
+  #     - run: npm ci
+  #     - run: npx prisma migrate deploy
+  #       env:
+  #         DATABASE_URL: postgresql://postgres:test@localhost:5432/watch_ecommerce_test
+  #     - run: npm run test -- src/tests/integration
+  #       env:
+  #         DATABASE_URL: postgresql://postgres:test@localhost:5432/watch_ecommerce_test
